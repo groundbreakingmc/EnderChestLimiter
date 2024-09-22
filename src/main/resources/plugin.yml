@@ -1,0 +1,23 @@
+name: EnderChestLimiter
+version: '${project.version}'
+main: groundbreaking.enderchestlimiter.EnderChestLimiter
+author: groundbreaking
+description: Limit items for player in his enderchest
+website: https://github.com/groundbreaking
+
+commands:
+  eclimiter: {}
+
+permissions:
+
+  enderchestlimiter.reload:
+    description: Allows you to reload plugin's configuration file
+
+  enderchestlimiter.bypass.all:
+    description: Allows you to bypass all limits
+
+  enderchestlimiter.admin:
+    default: op
+    children:
+      enderchestlimiter.bypass.all: true
+      enderchestlimiter.reload: true
