@@ -16,8 +16,12 @@ permissions:
   enderchestlimiter.bypass.all:
     description: Allows you to bypass all limits
 
+  eclimiter.updates:
+    description: Allows you to see updates notifications on join
+
   enderchestlimiter.admin:
     default: op
     children:
       enderchestlimiter.bypass.all: true
       enderchestlimiter.reload: true
+      eclimiter.updates: true
