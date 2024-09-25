@@ -13,23 +13,30 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class ItemLimiter implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent e) {
-        Player p = (Player) e.getWhoClicked();
-        if (p.hasPermission("eclimiter.bypass.all")) return;
+        final Player p = (Player) e.getWhoClicked();
+        if (p.hasPermission("eclimiter.bypass.all")) {
+            return;
+        }
 
-        Inventory clickedInventory = e.getClickedInventory();
-        Inventory destInv = e.getView().getTopInventory();
+        final Inventory clickedInventory = e.getClickedInventory();
+        final Inventory destInv = e.getView().getTopInventory();
 
-        if (clickedInventory == null || destInv.getType() != InventoryType.ENDER_CHEST) return;
+        if (clickedInventory == null || destInv.getType() != InventoryType.ENDER_CHEST) {
+            return;
+        }
 
         ItemStack item;
-        boolean isFromHotbar = InventoryAction.HOTBAR_SWAP.equals(e.getAction()) || InventoryAction.HOTBAR_MOVE_AND_READD.equals(e.getAction());
+        final boolean isFromHotbar = InventoryAction.HOTBAR_SWAP.equals(e.getAction()) || InventoryAction.HOTBAR_MOVE_AND_READD.equals(e.getAction());
         if (isFromHotbar && e.getHotbarButton() >= 0 && e.getHotbarButton() <= 8) {
             item = p.getInventory().getItem(e.getHotbarButton());
         }
@@ -45,76 +52,57 @@ public final class ItemLimiter implements Listener {
             return;
         }
 
-        ConfigValues.getGroupsKeys().stream()
-                .filter(group -> !p.hasPermission("enderchestlimiter.bypass." + group))
-                .forEach(group -> {
-                    Set<String> includedItems = ConfigValues.getGroupsLimitedItems().get(group);
+        final List<String> groupsKeys = ConfigValues.getGroupsKeys();
+        for (int i = 0; i < groupsKeys.size(); i++) {
+            String key = groupsKeys.get(i);
+            if (p.hasPermission("enderchestlimiter.bypass." + key)) {
+                continue;
+            }
 
-                    p.sendMessage("Set: " + includedItems);
-                    p.sendMessage("");
-                    p.sendMessage("Contains: " + includedItems.contains(item.getType().name()));
-                    if (includedItems.contains(item.getType().name())) {
-                        p.sendMessage("1");
+            final Set<String> includedItems = ConfigValues.getGroupsLimitedItems().get(key);
 
-                        Map<Material, Integer> itemCountMap = new HashMap<>();
+            p.sendMessage("Set: " + includedItems);
+            p.sendMessage("");
+            p.sendMessage("Contains: " + includedItems.contains(item.getType().name()));
+            if (includedItems.contains(item.getType().name())) {
+                p.sendMessage("1");
 
-                        AtomicInteger amount = new AtomicInteger();
-                        Arrays.stream(destInv.getStorageContents())
-                                .filter(it -> includedItems.contains(it.getType().name()))
-                                .forEach(it -> {
-                                    itemCountMap.put(it.getType(), itemCountMap.getOrDefault(it.getType(), 0) + it.getAmount());
-                                    amount.addAndGet(it.getAmount());
-                                });
-                        p.sendMessage("");
-                        p.sendMessage("Amount: " + amount);
-                        p.sendMessage("");
+                final Map<Material, Integer> itemCountMap = new HashMap<>();
 
-                        if (amount.get() + item.getAmount() > ConfigValues.getGroupsLimits().get(group)) {
-                            e.setCancelled(true);
-                            p.sendMessage("8");
-
-                            MessageSender.send(p, getDenyMessage(ConfigValues.getGroupsLimits().get(group), group));
-
-                            if (!ConfigValues.getGroupsSounds().get(group).equalsIgnoreCase("none")) {
-                                playDenySound(p, ConfigValues.getGroupsSounds().get(group));
-                            }
-                        }
+                final AtomicInteger amount = new AtomicInteger();
+                ItemStack[] storage = destInv.getStorageContents();
+                for (int r = 0; r < storage.length; r++) {
+                    ItemStack itemStack = storage[r];
+                    if (includedItems.contains(itemStack.getType().name())) {
+                        itemCountMap.put(itemStack.getType(), itemCountMap.getOrDefault(itemStack.getType(), 0) + itemStack.getAmount());
+                        amount.addAndGet(itemStack.getAmount());
                     }
-                });
-    }
+                }
+                p.sendMessage("");
+                p.sendMessage("Amount: " + amount);
+                p.sendMessage("");
 
-    private List<String> getDenyMessage(int limit, String group) {
-        if (limit % 100 >= 11 && limit % 100 <= 19) {
-            return ConfigValues.getTGroupsMessages().get(group);
-        } else {
-            switch (limit % 10) {
-                case 1:
-                    return ConfigValues.getFGroupsMessages().get(group);
-                case 2:
-                case 3:
-                case 4:
-                    return ConfigValues.getSGroupsMessages().get(group);
-                default:
-                    return ConfigValues.getTGroupsMessages().get(group);
+                if (amount.get() + item.getAmount() > ConfigValues.getGroupsLimits().get(key)) {
+                    e.setCancelled(true);
+                    p.sendMessage("8");
+
+                    MessageSender.send(p, ConfigValues.getGroupsLimitReachedMessages().get(key));
+
+                    if (!ConfigValues.getGroupsSounds().get(key).equalsIgnoreCase("none")) {
+                        playDenySound(p, ConfigValues.getGroupsSounds().get(key));
+                    }
+                }
             }
         }
     }
 
     private void playDenySound(Player player, String soundConfig) {
-        String[] params = soundConfig.split(";", 3);
+        final String[] params = soundConfig.split(";", 3);
 
-        Sound sound = Sound.ENTITY_SHULKER_HURT_CLOSED;
-        float volume = 1, pitch = 1;
+        final Sound sound = params.length == 1 && params[0] != null ? Sound.valueOf(params[0].toUpperCase()) : Sound.ENTITY_SHULKER_HURT_CLOSED;
+        final float volume = params.length == 2 && params[1] != null ? Float.parseFloat(params[1]) : 1.0f;
+        final float pitch = params.length == 3 && params[2] != null ? Float.parseFloat(params[2]) : 1.0f;
 
-        switch (params.length) {
-            case 3:
-                pitch = Float.parseFloat(params[2]);
-            case 2:
-                volume = Float.parseFloat(params[1]);
-            case 1:
-                sound = Sound.valueOf(params[0].toUpperCase());
-            default:
-                player.playSound(player.getLocation(), sound, volume, pitch);
-        }
+        player.playSound(player.getLocation(), sound, volume, pitch);
     }
 }

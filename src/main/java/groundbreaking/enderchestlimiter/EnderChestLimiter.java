@@ -1,6 +1,7 @@
 package groundbreaking.enderchestlimiter;
 
 import groundbreaking.enderchestlimiter.listeners.ItemLimiter;
+import groundbreaking.enderchestlimiter.listeners.UpdatesNotify;
 import groundbreaking.enderchestlimiter.utils.MessageSender;
 import groundbreaking.enderchestlimiter.utils.ServerInfos;
 import groundbreaking.enderchestlimiter.utils.UpdatesChecker;
@@ -10,22 +11,15 @@ import groundbreaking.enderchestlimiter.utils.colorizer.MiniMessagesColorizer;
 import groundbreaking.enderchestlimiter.utils.colorizer.VanilaColorizer;
 import groundbreaking.enderchestlimiter.utils.config.Config;
 import groundbreaking.enderchestlimiter.utils.config.ConfigValues;
+import lombok.Getter;
 import org.bukkit.Bukkit;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.jetbrains.annotations.NotNull;
-
-import java.util.logging.Logger;
 
 public final class EnderChestLimiter extends JavaPlugin {
 
-    private final Logger logger = getLogger();
+    private final ServerInfos infos = new ServerInfos(this);
 
-    private final PluginManager pluginManager = getServer().getPluginManager();
-
-    private final ServerInfos infos = new ServerInfos(getServer(), logger, pluginManager);
-
+    @Getter
     private IColorizer colorizer;
 
     @Override
@@ -43,13 +37,16 @@ public final class EnderChestLimiter extends JavaPlugin {
             return;
         }
 
-        Config cfg = new Config(this, logger);
-        cfg.loadConfig();
-        cfg.checkVersion();
-        new ConfigValues(logger, getConfig(), colorizer).setValues();
+        saveDefaultConfig();
+        new Config(this).checkVersion();
+        new ConfigValues(this).setValues();
+
+        final UpdatesChecker updatesChecker = new UpdatesChecker(this);
+        Bukkit.getScheduler().runTaskAsynchronously(this, updatesChecker::startCheck);
 
         {
             getServer().getPluginManager().registerEvents(new ItemLimiter(), this);
+            getServer().getPluginManager().registerEvents(new UpdatesNotify(this, updatesChecker), this);
 
             getCommand("eclimiter").setExecutor((sender, command, label, args) -> {
                 final long reloadStartTime = System.currentTimeMillis();
@@ -59,7 +56,9 @@ public final class EnderChestLimiter extends JavaPlugin {
                     return true;
                 }
 
-                reloadConfig();
+                new Config(this).checkVersion();
+                setColorizer();
+                new ConfigValues(this);
 
                 MessageSender.send(sender, ConfigValues.getReloadMessages(), "%time%", String.valueOf(System.currentTimeMillis() - reloadStartTime));
 
@@ -67,22 +66,7 @@ public final class EnderChestLimiter extends JavaPlugin {
             });
         }
 
-        final UpdatesChecker updatesChecker = new UpdatesChecker(this, getConfig(), logger);
-        Bukkit.getScheduler().runTaskAsynchronously(this, updatesChecker::startCheck);
-
-        logger.info("Plugin was successfully started in: " + (System.currentTimeMillis() - startTime) + "ms.");
-    }
-
-    @Override
-    public @NotNull FileConfiguration getConfig() {
-        return Config.getConfig();
-    }
-
-    @Override
-    public void reloadConfig() {
-        new Config(this, logger).loadConfig();
-        setColorizer();
-        new ConfigValues(logger, getConfig(), colorizer);
+        getLogger().info("Plugin was successfully started in: " + (System.currentTimeMillis() - startTime) + "ms.");
     }
 
     public void setColorizer() {

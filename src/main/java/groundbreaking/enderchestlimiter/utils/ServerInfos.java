@@ -1,50 +1,42 @@
 package groundbreaking.enderchestlimiter.utils;
 
+import groundbreaking.enderchestlimiter.EnderChestLimiter;
 import lombok.Getter;
-import org.bukkit.Server;
-import org.bukkit.plugin.PluginManager;
-
-import java.util.logging.Logger;
+import org.bukkit.Bukkit;
 
 public final class ServerInfos {
 
     @Getter
-    private final int subVersion = extractMainVersion();
-    @Getter
-    private final boolean isPapiExist = checkPapi();
-    @Getter
-    private final boolean isPaperOrFork = checkIsPaperOrFork();
-    @Getter
-    private final boolean isAbove16 = subVersion >= 16;
+    private final boolean
+            isPapiExist = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null,
+            isAbove16,
+            isPaperOrFork = checkIsPaperOrFork();
 
-    private final Server server;
-    private final Logger logger;
-    private final PluginManager pluginManager;
+    @Getter
+    private final int subVersion;
 
-    public ServerInfos(Server server, Logger logger, PluginManager pluginManager) {
-        this.server = server;
-        this.logger = logger;
-        this.pluginManager = pluginManager;
+    private final EnderChestLimiter plugin;
+
+    public ServerInfos(EnderChestLimiter plugin) {
+        this.plugin = plugin;
+        this.subVersion = extractMainVersion();
+        this.isAbove16 = subVersion >= 16;
     }
 
     public int extractMainVersion() {
         try {
-            return Integer.parseInt(server.getMinecraftVersion().split("\\.", 3)[1]);
+            return Integer.parseInt(plugin.getServer().getMinecraftVersion().split("\\.", 3)[1]);
         } catch (NumberFormatException ex) {
-            logger.warning("\u001b[32mFailed to extract server version. Plugin may not work correctly!");
+            plugin.getLogger().warning("\u001b[32mFailed to extract server version. Plugin may not work correctly!");
             return 0;
         }
-    }
-
-    public boolean checkPapi() {
-        return pluginManager.getPlugin("PlaceholderAPI") != null;
     }
 
     public boolean checkIsPaperOrFork() {
         try {
             Class.forName("com.destroystokyo.paper.utils.PaperPluginLogger");
             return true;
-        } catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException ignore) {
             return false;
         }
     }

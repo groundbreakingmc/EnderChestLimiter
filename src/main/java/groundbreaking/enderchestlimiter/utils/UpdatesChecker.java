@@ -22,10 +22,10 @@ public final class UpdatesChecker {
     private final FileConfiguration config;
     private final Logger logger;
 
-    public UpdatesChecker(EnderChestLimiter plugin, FileConfiguration config, Logger logger) {
+    public UpdatesChecker(EnderChestLimiter plugin) {
         this.plugin = plugin;
-        this.config = config;
-        this.logger = logger;
+        this.config = plugin.getConfig();
+        this.logger = plugin.getLogger();
     }
 
     public void startCheck() {

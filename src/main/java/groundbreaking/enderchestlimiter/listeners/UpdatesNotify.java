@@ -15,9 +15,9 @@ public final class UpdatesNotify implements Listener {
     private final IColorizer colorizer;
     private final UpdatesChecker updatesChecker;
 
-    public UpdatesNotify(EnderChestLimiter plugin, IColorizer colorizer, UpdatesChecker updatesChecker) {
+    public UpdatesNotify(EnderChestLimiter plugin, UpdatesChecker updatesChecker) {
         this.plugin = plugin;
-        this.colorizer = colorizer;
+        this.colorizer = plugin.getColorizer();
         this.updatesChecker = updatesChecker;
     }
 

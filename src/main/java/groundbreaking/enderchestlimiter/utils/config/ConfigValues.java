@@ -1,14 +1,11 @@
 package groundbreaking.enderchestlimiter.utils.config;
 
+import groundbreaking.enderchestlimiter.EnderChestLimiter;
 import groundbreaking.enderchestlimiter.utils.colorizer.IColorizer;
 import lombok.Getter;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
 
 import java.util.*;
-import java.util.logging.Logger;
-
-import static groundbreaking.enderchestlimiter.EnderChestLimiter.getInstance;
 
 public final class ConfigValues {
 
@@ -17,8 +14,8 @@ public final class ConfigValues {
             useMinimessage;
 
     @Getter
-    private static final Set<String>
-            groupsKeys = new HashSet<>();
+    private static final List<String>
+            groupsKeys = new ArrayList<>();
 
     @Getter
     private static HashMap<String, Integer>
@@ -30,9 +27,7 @@ public final class ConfigValues {
 
     @Getter
     private static HashMap<String, List<String>>
-            fGroupsMessages = new HashMap<>(),
-            sGroupsMessages = new HashMap<>(),
-            tGroupsMessages = new HashMap<>();
+            groupsLimitReachedMessages = new HashMap<>();
 
     @Getter
     private static HashMap<String, String>
@@ -43,25 +38,23 @@ public final class ConfigValues {
             noPermMessages = new ArrayList<>(),
             reloadMessages = new ArrayList<>();
 
-    private final Logger logger;
-    private final FileConfiguration config;
-    private final IColorizer colorizer;
+    private final EnderChestLimiter plugin;
 
-    public ConfigValues(Logger logger, FileConfiguration config, IColorizer colorizer) {
-        this.logger = logger;
-        this.config = config;
-        this.colorizer = colorizer;
+    public ConfigValues(EnderChestLimiter plugin) {
+        this.plugin = plugin;
     }
 
     public void setValues() {
-        final ConfigurationSection settings = config.getConfigurationSection("settings");
-        final ConfigurationSection groups = config.getConfigurationSection("groups");
-        final ConfigurationSection messages = config.getConfigurationSection("messages");
+        final ConfigurationSection settings = plugin.getConfig().getConfigurationSection("settings");
+        final ConfigurationSection groups = plugin.getConfig().getConfigurationSection("groups");
+        final ConfigurationSection messages = plugin.getConfig().getConfigurationSection("messages");
+
+        final IColorizer colorizer = plugin.getColorizer();
 
         if (settings != null) {
             useMinimessage = settings.getBoolean("use-minimessage");
         } else {
-            logger.warning("\u001b[91mFailed to load values from \"settings\" section. Please check your configuration file, or delete it and restart your server!\u001b[0m");
+            plugin.getLogger().warning("\u001b[91mFailed to load values from \"settings\" section. Please check your configuration file, or delete it and restart your server!\u001b[0m");
         }
 
         if (groups != null) {
@@ -69,7 +62,7 @@ public final class ConfigValues {
             groupsKeys.clear();
             groupsLimits.clear();
             groupsLimitedItems.clear();
-            fGroupsMessages.clear(); sGroupsMessages.clear(); tGroupsMessages.clear();
+            groupsLimitReachedMessages.clear();
             groupsSounds.clear();
 
             groupsKeys.addAll(groups.getKeys(false));
@@ -82,43 +75,31 @@ public final class ConfigValues {
 
                 int limit = groups.getInt(key + ".limit");
                 if (limit < 1) {
-                    logger.warning("Limit for group \"" + key + "\" is less than 1! Limit will change to 1.");
-                    config.set("groups." + key + ".limit", 1);
-                    getInstance().saveConfig();
+                    plugin.getLogger().warning("Limit for group \"" + key + "\" is less than 1! Limit will change to 1.");
+                    plugin.getConfig().set("groups." + key + ".limit", 1);
+                    plugin.saveConfig();
                     limit = 1;
                 }
 
                 groupsLimits.put(key, limit);
-                fGroupsMessages.put(key, getMessages(groups, key + ".deny-message-1", limit));
-                sGroupsMessages.put(key, getMessages(groups, key + ".deny-message-2", limit));
-                tGroupsMessages.put(key, getMessages(groups, key + ".deny-message-3", limit));
+                groupsLimitReachedMessages.put(key, getMessages(groups, key + ".deny-message", colorizer));
                 groupsSounds.put(key, groups.getString(key + ".deny-sound", ""));
             }
         } else {
-            logger.warning("\u001b[91mFailed to load values from \"groups\" section. Please check your configuration file, or delete it and restart your server!\u001b[0m");
+            plugin.getLogger().warning("\u001b[91mFailed to load values from \"groups\" section. Please check your configuration file, or delete it and restart your server!\u001b[0m");
         }
 
         if (messages != null) {
             noPermMessages.clear();
-            noPermMessages.addAll(getMessages(messages, "no-perm"));
+            noPermMessages.addAll(getMessages(messages, "no-perm", colorizer));
             reloadMessages.clear();
-            reloadMessages.addAll(getMessages(messages, "reload"));
+            reloadMessages.addAll(getMessages(messages, "reload", colorizer));
         } else {
-            logger.warning("\u001b[91mFailed to load messages from \"messages\" section. Please check your configuration file, or delete it and restart your server!\u001b[0m");
+            plugin.getLogger().warning("\u001b[91mFailed to load messages from \"messages\" section. Please check your configuration file, or delete it and restart your server!\u001b[0m");
         }
     }
 
-    public List<String> getMessages(ConfigurationSection section, String path, int limit) {
-        List<String> list = getMessages(section, path);
-
-        for (int i = 0; i < list.size() - 1; i++) {
-            list.set(i, list.get(i).replace("%max%", String.valueOf(limit)));
-        }
-
-        return list;
-    }
-
-    public List<String> getMessages(ConfigurationSection section, String path) {
+    public List<String> getMessages(ConfigurationSection section, String path, IColorizer colorizer) {
         final Object obj = section.get(path);
 
         if (obj instanceof String) {
